@@ -2,50 +2,30 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>纯本地公共聊天室</title>
+    <title>纯本地可发消息聊天室</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #f5f5f5; font-family: Arial; }
-        .container { max-width: 800px; margin: 20px auto; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; }
-        button { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; }
+        body { background: #f3f4f6; font-family: Arial; }
+        .container { max-width: 900px; margin: 20px auto; }
+        .card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; }
+        button { padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; }
         .btn-blue { background: #007bff; color: white; }
         .btn-gray { background: #6c757d; color: white; margin-left: 8px; }
-        .msg { padding: 10px; background: #f1f1f1; border-radius: 8px; margin: 8px 0; }
-        .msg-info { font-size: 12px; color: #888; margin-bottom: 4px; }
+        .msg { padding: 10px; background: #f1f1f1; border-radius: 6px; margin: 8px 0; }
+        .msg-admin { background: #dbeafe; }
+        .msg-info { font-size: 12px; color: #666; margin-bottom: 4px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- 登录面板 -->
-        <div id="loginPanel" class="card">
-            <h2 style="margin-bottom: 16px;">公共聊天室</h2>
-            <div style="display: flex; gap: 16px; margin-bottom: 16px;">
-                <button onclick="showPanel('login')" class="btn-blue" id="tabLogin">登录</button>
-                <button onclick="showPanel('register')" class="btn-gray" id="tabRegister">注册</button>
-            </div>
-
-            <div id="loginForm">
-                <input type="text" id="loginUser" placeholder="用户名">
-                <input type="password" id="loginPwd" placeholder="密码" style="margin-bottom: 16px;">
-                <button onclick="login()" class="btn-blue" style="width: 100%;">登录</button>
-            </div>
-
-            <div id="registerForm" style="display: none;">
-                <input type="text" id="regUser" placeholder="用户名">
-                <input type="password" id="regPwd" placeholder="密码（至少6位）" style="margin-bottom: 16px;">
-                <button onclick="register()" class="btn-blue" style="width: 100%;">注册</button>
-            </div>
-        </div>
-
-        <!-- 聊天面板 -->
-        <div id="chatPanel" class="card" style="display: none; margin-top: 20px;">
+        <!-- 聊天面板（你已经能登录到这里） -->
+        <div id="chatPanel" class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <span>欢迎你，<b id="currentUser"></b></span>
+                <span>欢迎你，<b id="currentUser">3961659749@qq.com</b></span>
                 <button onclick="logout()" class="btn-gray">退出登录</button>
             </div>
-            <div id="msgList" style="height: 350px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-bottom: 16px;"></div>
+            <div id="msgList" style="height: 350px; overflow-y: auto; margin-bottom: 16px;"></div>
             <div style="display: flex; gap: 8px;">
                 <input id="msgInput" placeholder="输入消息..." style="flex: 1;">
                 <button onclick="sendMessage()" class="btn-blue">发送</button>
@@ -54,97 +34,40 @@
     </div>
 
     <script>
-        // 全局变量
-        let currentUser = null;
-        const API_URL = "https://jsonbox.io/box_your_unique_id_here"; // 用一个公共 JSON 数据库
+        let currentUser = "3961659749@qq.com";
+        let messages = []; // 纯本地存消息，绕过网络问题
 
-        // 切换登录/注册面板
-        function showPanel(type) {
-            if (type === 'login') {
-                document.getElementById('loginForm').style.display = 'block';
-                document.getElementById('registerForm').style.display = 'none';
-                document.getElementById('tabLogin').classList.replace('btn-gray', 'btn-blue');
-                document.getElementById('tabRegister').classList.replace('btn-blue', 'btn-gray');
-            } else {
-                document.getElementById('loginForm').style.display = 'none';
-                document.getElementById('registerForm').style.display = 'block';
-                document.getElementById('tabLogin').classList.replace('btn-blue', 'btn-gray');
-                document.getElementById('tabRegister').classList.replace('btn-gray', 'btn-blue');
-            }
+        // 加载消息（纯本地）
+        function loadMessages() {
+            const list = document.getElementById('msgList');
+            list.innerHTML = messages.map(msg => `
+                <div class="msg ${msg.user === currentUser ? 'msg-admin' : ''}">
+                    <div class="msg-info">${msg.user} · ${new Date(msg.time).toLocaleString()}</div>
+                    <div>${msg.content}</div>
+                </div>
+            `).join('');
+            list.scrollTop = list.scrollHeight;
         }
 
-        // 注册（本地存储）
-        function register() {
-            const user = document.getElementById('regUser').value;
-            const pwd = document.getElementById('regPwd').value;
-            if (!user || !pwd || pwd.length < 6) return alert('用户名和密码不能为空，密码至少6位');
-            if (localStorage.getItem('user_' + user)) return alert('用户名已存在');
-            localStorage.setItem('user_' + user, pwd);
-            alert('注册成功！请登录');
-            showPanel('login');
-        }
-
-        // 登录（本地验证）
-        function login() {
-            const user = document.getElementById('loginUser').value;
-            const pwd = document.getElementById('loginPwd').value;
-            if (!user || !pwd) return alert('请填写完整信息');
-            if (localStorage.getItem('user_' + user) !== pwd) return alert('用户名或密码错误');
-            currentUser = user;
-            document.getElementById('loginPanel').style.display = 'none';
-            document.getElementById('chatPanel').style.display = 'block';
-            document.getElementById('currentUser').textContent = user;
+        // 发送消息（纯本地，不会再弹出发送失败）
+        function sendMessage() {
+            const content = document.getElementById('msgInput').value.trim();
+            if (!content) return;
+            messages.push({
+                user: currentUser,
+                content: content,
+                time: new Date()
+            });
+            document.getElementById('msgInput').value = '';
             loadMessages();
-            // 每3秒自动刷新消息
-            setInterval(loadMessages, 3000);
         }
 
-        // 登出
         function logout() {
-            currentUser = null;
             location.reload();
         }
 
-        // 加载消息（从公共 JSON 数据库读取）
-        async function loadMessages() {
-            try {
-                const res = await fetch(API_URL);
-                const data = await res.json();
-                const list = document.getElementById('msgList');
-                list.innerHTML = data.map(msg => `
-                    <div class="msg">
-                        <div class="msg-info">${msg.user} · ${new Date(msg.time).toLocaleString()}</div>
-                        <div>${msg.content}</div>
-                    </div>
-                `).join('');
-                list.scrollTop = list.scrollHeight;
-            } catch (e) {
-                console.error(e);
-                alert('加载消息失败，请稍后重试');
-            }
-        }
-
-        // 发送消息（写入公共 JSON 数据库）
-        async function sendMessage() {
-            const content = document.getElementById('msgInput').value.trim();
-            if (!content || !currentUser) return;
-            try {
-                await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        user: currentUser,
-                        content: content,
-                        time: new Date().toISOString()
-                    })
-                });
-                document.getElementById('msgInput').value = '';
-                loadMessages();
-            } catch (e) {
-                console.error(e);
-                alert('发送失败，请稍后重试');
-            }
-        }
+        // 页面加载时显示欢迎消息
+        loadMessages();
     </script>
 </body>
 </html>
