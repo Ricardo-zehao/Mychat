@@ -2,107 +2,149 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>无敌公共聊天室</title>
+    <title>纯本地公共聊天室</title>
     <style>
-        *{box-sizing:border-box}body{margin:0;background:#f5f5f5;font-family:Arial}.box{max-width:800px;margin:20px auto;background:white;padding:20px;border-radius:10px;box-shadow:0 0 10px #0002}.inp{width:100%;padding:10px;margin:8px 0;border:1px solid #ddd;border-radius:8px}.btn{padding:10px 20px;border:none;border-radius:8px;background:#007bff;color:white;cursor:pointer}.btn-gray{background:#6c757d}.msg{padding:10px;background:#f1f1f1;border-radius:8px;margin:8px 0}.msg-self{background:#cfe9ff}.info{font-size:12px;color:#888;margin-bottom:4px}
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #f5f5f5; font-family: Arial; }
+        .container { max-width: 800px; margin: 20px auto; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; }
+        button { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; }
+        .btn-blue { background: #007bff; color: white; }
+        .btn-gray { background: #6c757d; color: white; margin-left: 8px; }
+        .msg { padding: 10px; background: #f1f1f1; border-radius: 8px; margin: 8px 0; }
+        .msg-info { font-size: 12px; color: #888; margin-bottom: 4px; }
     </style>
 </head>
 <body>
-
-<div class="box" id="loginBox">
-    <h2>公共聊天室</h2>
-    <input id="loginUser" class="inp" placeholder="用户名">
-    <input id="loginPwd" class="inp" type="password" placeholder="密码">
-    <button onclick="doLogin()" class="btn">登录</button>
-    <button onclick="showReg()" class="btn btn-gray">去注册</button>
-</div>
-
-<div class="box" id="regBox" style="display:none">
-    <h2>注册</h2>
-    <input id="regUser" class="inp" placeholder="用户名">
-    <input id="regPwd" class="inp" type="password" placeholder="密码至少6位">
-    <button onclick="doReg()" class="btn">注册</button>
-    <button onclick="showLogin()" class="btn btn-gray">返回登录</button>
-</div>
-
-<div class="box" id="chatBox" style="display:none">
-    <div style="margin-bottom:10px">
-        欢迎你，<span id="nowUser" style="font-weight:bold"></span> | <button onclick="logout()" class="btn btn-gray">退出</button>
-    </div>
-    <div id="msgList" style="height:300px;overflow-y:auto;border:1px solid #ddd;padding:10px;border-radius:8px;margin-bottom:10px"></div>
-    <input id="msgTxt" class="inp" placeholder="输入消息...">
-    <button onclick="sendMsg()" class="btn">发送</button>
-</div>
-
-<!-- 只保留 Supabase 作为存数据的工具 -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-    // 你的 Supabase 配置（只用它存消息，不用它登录）
-    const SUPABASE_URL = 'https://ceapbcodobfkdakkcfgv.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_3ZEm9C76K2RzRlsXvm-DKw_ofuJBVuY';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    let user = null;
-
-    // ---- 界面切换 ----
-    function showReg(){ document.getElementById('loginBox').style.display='none'; document.getElementById('regBox').style.display='block'; }
-    function showLogin(){ document.getElementById('regBox').style.display='none'; document.getElementById('loginBox').style.display='block'; }
-
-    // ---- 本地注册登录（完全绕过邮箱验证） ----
-    function doReg(){
-        let u = document.getElementById('regUser').value;
-        let p = document.getElementById('regPwd').value;
-        if(!u||!p||p.length<6)return alert('请填完整');
-        if(localStorage.getItem('u_'+u))return alert('用户名已存在');
-        localStorage.setItem('u_'+u, p);
-        alert('注册成功！请登录');
-        showLogin();
-    }
-    function doLogin(){
-        let u = document.getElementById('loginUser').value;
-        let p = document.getElementById('loginPwd').value;
-        if(localStorage.getItem('u_'+u)===p){
-            user = u;
-            document.getElementById('loginBox').style.display='none';
-            document.getElementById('chatBox').style.display='block';
-            document.getElementById('nowUser').innerText = u;
-            loadMsg();
-            // 实时监听
-            supabase.channel('public:msgs').on('postgres_changes', {event:'INSERT', schema:'public', table:'messages'}, loadMsg).subscribe();
-        }else{
-            alert('账号或密码错误');
-        }
-    }
-
-    // ---- 消息逻辑 ----
-    async function loadMsg(){
-        let {data} = await supabase.from('messages').select('*').order('created_at', {asc:true});
-        let list = document.getElementById('msgList');
-        list.innerHTML = data.map(m=>`
-            <div class="msg ${m.user_email===user?'msg-self':''}">
-                <div class="info">${m.user_email} · ${new Date(m.created_at).toLocaleString()}</div>
-                <div>${m.content}</div>
+    <div class="container">
+        <!-- 登录面板 -->
+        <div id="loginPanel" class="card">
+            <h2 style="margin-bottom: 16px;">公共聊天室</h2>
+            <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+                <button onclick="showPanel('login')" class="btn-blue" id="tabLogin">登录</button>
+                <button onclick="showPanel('register')" class="btn-gray" id="tabRegister">注册</button>
             </div>
-        `).join('');
-        list.scrollTop = list.scrollHeight;
-    }
-    async function sendMsg(){
-        let txt = document.getElementById('msgTxt').value.trim();
-        if(!txt||!user)return;
-        await supabase.from('messages').insert([{user_email: user, content: txt}]);
-        document.getElementById('msgTxt').value = '';
-    }
-    function logout(){ user=null; location.reload(); }
 
-    // 自动登录（如果本地有存）
-    window.onload = function(){
-        for(let k in localStorage){
-            if(k.startsWith('u_')){
-                document.getElementById('loginUser').value = k.substring(2);
-                break;
+            <div id="loginForm">
+                <input type="text" id="loginUser" placeholder="用户名">
+                <input type="password" id="loginPwd" placeholder="密码" style="margin-bottom: 16px;">
+                <button onclick="login()" class="btn-blue" style="width: 100%;">登录</button>
+            </div>
+
+            <div id="registerForm" style="display: none;">
+                <input type="text" id="regUser" placeholder="用户名">
+                <input type="password" id="regPwd" placeholder="密码（至少6位）" style="margin-bottom: 16px;">
+                <button onclick="register()" class="btn-blue" style="width: 100%;">注册</button>
+            </div>
+        </div>
+
+        <!-- 聊天面板 -->
+        <div id="chatPanel" class="card" style="display: none; margin-top: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <span>欢迎你，<b id="currentUser"></b></span>
+                <button onclick="logout()" class="btn-gray">退出登录</button>
+            </div>
+            <div id="msgList" style="height: 350px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-bottom: 16px;"></div>
+            <div style="display: flex; gap: 8px;">
+                <input id="msgInput" placeholder="输入消息..." style="flex: 1;">
+                <button onclick="sendMessage()" class="btn-blue">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let currentUser = null;
+        const API_URL = "https://jsonbox.io/box_your_unique_id_here"; // 用一个公共 JSON 数据库
+
+        // 切换登录/注册面板
+        function showPanel(type) {
+            if (type === 'login') {
+                document.getElementById('loginForm').style.display = 'block';
+                document.getElementById('registerForm').style.display = 'none';
+                document.getElementById('tabLogin').classList.replace('btn-gray', 'btn-blue');
+                document.getElementById('tabRegister').classList.replace('btn-blue', 'btn-gray');
+            } else {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('registerForm').style.display = 'block';
+                document.getElementById('tabLogin').classList.replace('btn-blue', 'btn-gray');
+                document.getElementById('tabRegister').classList.replace('btn-gray', 'btn-blue');
             }
         }
-    }
-</script>
+
+        // 注册（本地存储）
+        function register() {
+            const user = document.getElementById('regUser').value;
+            const pwd = document.getElementById('regPwd').value;
+            if (!user || !pwd || pwd.length < 6) return alert('用户名和密码不能为空，密码至少6位');
+            if (localStorage.getItem('user_' + user)) return alert('用户名已存在');
+            localStorage.setItem('user_' + user, pwd);
+            alert('注册成功！请登录');
+            showPanel('login');
+        }
+
+        // 登录（本地验证）
+        function login() {
+            const user = document.getElementById('loginUser').value;
+            const pwd = document.getElementById('loginPwd').value;
+            if (!user || !pwd) return alert('请填写完整信息');
+            if (localStorage.getItem('user_' + user) !== pwd) return alert('用户名或密码错误');
+            currentUser = user;
+            document.getElementById('loginPanel').style.display = 'none';
+            document.getElementById('chatPanel').style.display = 'block';
+            document.getElementById('currentUser').textContent = user;
+            loadMessages();
+            // 每3秒自动刷新消息
+            setInterval(loadMessages, 3000);
+        }
+
+        // 登出
+        function logout() {
+            currentUser = null;
+            location.reload();
+        }
+
+        // 加载消息（从公共 JSON 数据库读取）
+        async function loadMessages() {
+            try {
+                const res = await fetch(API_URL);
+                const data = await res.json();
+                const list = document.getElementById('msgList');
+                list.innerHTML = data.map(msg => `
+                    <div class="msg">
+                        <div class="msg-info">${msg.user} · ${new Date(msg.time).toLocaleString()}</div>
+                        <div>${msg.content}</div>
+                    </div>
+                `).join('');
+                list.scrollTop = list.scrollHeight;
+            } catch (e) {
+                console.error(e);
+                alert('加载消息失败，请稍后重试');
+            }
+        }
+
+        // 发送消息（写入公共 JSON 数据库）
+        async function sendMessage() {
+            const content = document.getElementById('msgInput').value.trim();
+            if (!content || !currentUser) return;
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user: currentUser,
+                        content: content,
+                        time: new Date().toISOString()
+                    })
+                });
+                document.getElementById('msgInput').value = '';
+                loadMessages();
+            } catch (e) {
+                console.error(e);
+                alert('发送失败，请稍后重试');
+            }
+        }
+    </script>
 </body>
 </html>
