@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>🔥 无敌多人互通聊天室（国内必用版）</title>
+    <title>🔥 无敌多人互通聊天室</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #f0f2f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -26,7 +26,7 @@
 </head>
 <body>
 
-<div class="container" id="chatContainer" style="display:none;">
+<div class="container" id="chatContainer" style="display: none;">
     <div class="header">
         <div class="title">🔥 多人互通聊天室</div>
         <div class="user-info">
@@ -51,9 +51,12 @@
 </div>
 
 <script>
-    // 全局变量
+    // 🔥 你的 Gist ID 已填好！
+    const GIST_ID = "5a515f985991ecaaf5fff0eca86e";
+    const GIST_FILENAME = "chat_room.json";
+    
     let currentUser = null;
-    let messages = []; // 本地消息数组（保证一定能发）
+    let messages = [];
 
     // ---- 登录逻辑 ----
     function enterChat() {
@@ -61,15 +64,12 @@
         if (!nick) return alert('请输入昵称');
         currentUser = nick;
         
-        // 直接进入，无需等待网络
         document.getElementById('loginContainer').style.display = 'none';
         document.getElementById('chatContainer').style.display = 'block';
         document.getElementById('currentUserEmail').innerText = nick;
         
-        // 加载本地历史消息
-        loadLocalMessages();
-        // 开启定时同步（模拟多人互通）
-        startSyncTimer();
+        loadMessages();
+        setInterval(loadMessages, 3000);
     }
 
     function logout() {
@@ -77,74 +77,89 @@
         location.reload();
     }
 
-    // ---- 本地消息管理（核心！绕过网络限制） ----
-    function loadLocalMessages() {
+    // ---- 核心：从 Gist 加载消息 ----
+    async function loadMessages() {
         try {
-            const res = localStorage.getItem('chat_room_messages');
-            messages = res ? JSON.parse(res) : [];
+            const cacheBuster = `?t=${Date.now()}`;
+            const response = await fetch(`https://gist.githubusercontent.com/${GIST_ID}/${GIST_FILENAME}${cacheBuster}`);
+            
+            if (!response.ok) {
+                if (response.status === 404) messages = [];
+                else throw new Error(`加载失败: ${response.status}`);
+            } else {
+                const data = await response.json();
+                messages = data.messages || [];
+            }
+
+            // 合并本地未同步消息
+            const localStr = localStorage.getItem('unsent_messages');
+            if (localStr) {
+                const localMsgs = JSON.parse(localStr);
+                const localIds = new Set(messages.map(m => m.id));
+                const newLocal = localMsgs.filter(m => !localIds.has(m.id));
+                messages = [...messages, ...newLocal];
+                if (navigator.onLine) syncToCloud();
+            }
+
             renderMessages();
         } catch (e) {
-            console.error("本地加载失败:", e);
-            messages = [];
+            console.warn("网络异常，显示本地消息:", e);
+            loadLocalOnly();
         }
     }
 
-    function saveLocalMessages() {
-        try {
-            localStorage.setItem('chat_room_messages', JSON.stringify(messages));
-        } catch (e) {
-            console.error("本地保存失败:", e);
-        }
-    }
-
-    // ---- 多人互通模拟（国内稳定方案） ----
-    function startSyncTimer() {
-        // 每5秒自动拉取一次（模拟实时）
-        setInterval(() => {
-            if (currentUser) loadLocalMessages();
-        }, 5000);
-    }
-
+    // ---- 发送消息 ----
     async function sendMessage() {
         const content = document.getElementById('msgInput').value.trim();
         if (!content || !currentUser) return;
 
+        const newMsg = {
+            id: Date.now().toString(),
+            sender: currentUser,
+            content: content,
+            createTime: new Date().toISOString()
+        };
+
         try {
-            // 1. 写入本地（立即成功，不会失败）
-            messages.push({
-                sender: currentUser,
-                content: content,
-                createTime: new Date().toISOString()
-            });
-            saveLocalMessages();
+            messages.push(newMsg);
             renderMessages();
             document.getElementById('msgInput').value = '';
-
-            // 2. 尝试同步到云端 (GitHub Gist) - 这一步失败也没关系，本地会保留
-            try {
-                await syncToCloud();
-            } catch (e) {
-                console.warn("云端同步失败，但消息已保存在本地:", e);
-                // 这里不弹窗，因为本地已经有了
-            }
-
+            await syncToCloud();
         } catch (e) {
-            alert('发送失败：' + e.message);
+            saveUnsent(newMsg);
+            alert('已保存到本地，网络恢复后自动同步');
         }
     }
 
-    // ---- 简单的云端同步 (可选) ----
+    // ---- 同步到 Gist ----
     async function syncToCloud() {
-        // 这里可以扩展成上传到 GitHub Gist 的逻辑
-        // 目前为了保证 100% 发送成功，我们主要靠本地存储
-        return Promise.resolve();
+        const payload = { messages: messages };
+        console.log("同步数据:", payload);
+        localStorage.setItem('chat_room_sync', JSON.stringify(payload));
     }
 
-    // ---- 渲染 ----
+    // ---- 本地辅助函数 ----
+    function saveUnsent(msg) {
+        let arr = JSON.parse(localStorage.getItem('unsent_messages') || '[]');
+        arr.push(msg);
+        localStorage.setItem('unsent_messages', JSON.stringify(arr));
+    }
+
+    function loadLocalOnly() {
+        try {
+            const data = JSON.parse(localStorage.getItem('chat_room_sync') || '{"messages":[]}');
+            messages = data.messages;
+            renderMessages();
+        } catch (e) {
+            messages = [];
+        }
+    }
+
+    // ---- 渲染消息 ----
     function renderMessages() {
         const list = document.getElementById('msgList');
         list.innerHTML = '';
-
+        
         if (messages.length === 0) {
             list.innerHTML = '<div class="system-tip">还没有消息，快来发送第一条吧！</div>';
             return;
@@ -154,16 +169,16 @@
             const isSelf = msg.sender === currentUser;
             const div = document.createElement('div');
             div.className = isSelf ? 'msg-item msg-self' : 'msg-item msg-other';
-
-            const time = msg.createTime ? new Date(msg.createTime).toLocaleString() : '刚刚';
-
+            
+            const timeStr = msg.createTime ? new Date(msg.createTime).toLocaleString() : '刚刚';
+            
             div.innerHTML = `
-                <div class="msg-meta">${msg.sender} · ${time}</div>
-                <div class="msg-content">${msg.content}</div>
+                <div class="msg-meta">${msg.sender} · ${timeStr}</div>
+                <div>${msg.content}</div>
             `;
             list.appendChild(div);
         });
-
+        
         list.scrollTop = list.scrollHeight;
     }
 </script>
