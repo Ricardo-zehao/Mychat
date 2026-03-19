@@ -2,72 +2,182 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>纯本地可发消息聊天室</title>
+    <title>🔥 纯免费多人互通聊天室</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #f3f4f6; font-family: Arial; }
-        .container { max-width: 900px; margin: 20px auto; }
-        .card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; }
-        button { padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; }
-        .btn-blue { background: #007bff; color: white; }
-        .btn-gray { background: #6c757d; color: white; margin-left: 8px; }
-        .msg { padding: 10px; background: #f1f1f1; border-radius: 6px; margin: 8px 0; }
-        .msg-admin { background: #dbeafe; }
-        .msg-info { font-size: 12px; color: #666; margin-bottom: 4px; }
+        body { background: #f0f2f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .container { max-width: 800px; margin: 20px auto; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .header { padding: 16px 20px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }
+        .title { font-size: 18px; font-weight: 600; color: #333; }
+        .user-info { font-size: 14px; color: #666; }
+        .logout-btn { padding: 6px 12px; background: #f5f5f5; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        .chat-area { padding: 20px; height: 500px; display: flex; flex-direction: column; }
+        .msg-list { flex: 1; overflow-y: auto; margin-bottom: 16px; padding-right: 4px; }
+        .msg-item { margin-bottom: 12px; max-width: 70%; }
+        .msg-other { background: #e9e9eb; border-radius: 18px 18px 18px 4px; padding: 10px 14px; color: #333; }
+        .msg-self { background: #007aff; color: white; border-radius: 18px 18px 4px 18px; padding: 10px 14px; margin-left: auto; }
+        .msg-meta { font-size: 12px; color: #999; margin-bottom: 4px; padding: 0 4px; }
+        .msg-self .msg-meta { color: #d1e3ff; text-align: right; }
+        .input-area { display: flex; gap: 8px; align-items: flex-end; }
+        .msg-input { flex: 1; padding: 12px 16px; border: 1px solid #ddd; border-radius: 20px; outline: none; font-size: 16px; resize: none; height: 44px; }
+        .send-btn { width: 44px; height: 44px; background: #007aff; color: white; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+        .system-tip { text-align: center; font-size: 12px; color: #999; margin: 8px 0; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- 聊天面板（你已经能登录到这里） -->
-        <div id="chatPanel" class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <span>欢迎你，<b id="currentUser">3961659749@qq.com</b></span>
-                <button onclick="logout()" class="btn-gray">退出登录</button>
-            </div>
-            <div id="msgList" style="height: 350px; overflow-y: auto; margin-bottom: 16px;"></div>
-            <div style="display: flex; gap: 8px;">
-                <input id="msgInput" placeholder="输入消息..." style="flex: 1;">
-                <button onclick="sendMessage()" class="btn-blue">发送</button>
-            </div>
+
+<div class="container" id="chatContainer" style="display: none;">
+    <div class="header">
+        <div class="title">🔥 纯免费多人互通聊天室</div>
+        <div class="user-info">
+            欢迎你, <span id="currentUser"></span>
+            <button class="logout-btn" onclick="logout()">退出</button>
         </div>
     </div>
+    <div class="chat-area">
+        <div class="msg-list" id="msgList"></div>
+        <div class="input-area">
+            <input type="text" id="msgInput" class="msg-input" placeholder="输入消息...">
+            <button class="send-btn" onclick="sendMessage()">➤</button>
+        </div>
+    </div>
+</div>
 
-    <script>
-        let currentUser = "3961659749@qq.com";
-        let messages = []; // 纯本地存消息，绕过网络问题
+<div id="authContainer" style="text-align:center; margin-top:100px;">
+    <h2>账号登录</h2>
+    <div style="margin:10px 0;">
+        <button onclick="showPanel('login')" id="tabLogin" style="padding:8px 16px; background:#007aff; color:white; border:none; border-radius:6px; cursor:pointer;">登录</button>
+        <button onclick="showPanel('register')" id="tabRegister" style="padding:8px 16px; background:#ccc; color:white; border:none; border-radius:6px; cursor:pointer; margin-left:8px;">注册</button>
+    </div>
 
-        // 加载消息（纯本地）
-        function loadMessages() {
-            const list = document.getElementById('msgList');
-            list.innerHTML = messages.map(msg => `
-                <div class="msg ${msg.user === currentUser ? 'msg-admin' : ''}">
-                    <div class="msg-info">${msg.user} · ${new Date(msg.time).toLocaleString()}</div>
-                    <div>${msg.content}</div>
-                </div>
-            `).join('');
-            list.scrollTop = list.scrollHeight;
+    <div id="loginForm" style="margin-top:20px;">
+        <input type="text" id="loginUser" placeholder="用户名" style="padding:10px; width:300px; margin:8px 0; border-radius:8px; border:1px solid #ccc;">
+        <br>
+        <input type="password" id="loginPwd" placeholder="密码" style="padding:10px; width:300px; margin:8px 0; border-radius:8px; border:1px solid #ccc;">
+        <br>
+        <button onclick="login()" style="padding:10px 20px; background:#007aff; color:white; border:none; border-radius:8px; cursor:pointer; margin-top:10px;">登录</button>
+    </div>
+
+    <div id="registerForm" style="display:none; margin-top:20px;">
+        <input type="text" id="regUser" placeholder="用户名" style="padding:10px; width:300px; margin:8px 0; border-radius:8px; border:1px solid #ccc;">
+        <br>
+        <input type="password" id="regPwd" placeholder="密码（至少6位）" style="padding:10px; width:300px; margin:8px 0; border-radius:8px; border:1px solid #ccc;">
+        <br>
+        <button onclick="register()" style="padding:10px 20px; background:#007aff; color:white; border:none; border-radius:8px; cursor:pointer; margin-top:10px;">注册</button>
+    </div>
+</div>
+
+<script>
+    // 🔥 纯免费公共数据库（无需注册，直接用）
+    const API_URL = "https://jsonbox.io/box_chat_room_123456"; // 唯一公共房间ID
+    let currentUser = null;
+
+    // ---- 登录/注册面板切换 ----
+    function showPanel(type) {
+        if (type === 'login') {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('registerForm').style.display = 'none';
+            document.getElementById('tabLogin').style.background = '#007aff';
+            document.getElementById('tabRegister').style.background = '#ccc';
+        } else {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'block';
+            document.getElementById('tabLogin').style.background = '#ccc';
+            document.getElementById('tabRegister').style.background = '#007aff';
         }
+    }
 
-        // 发送消息（纯本地，不会再弹出发送失败）
-        function sendMessage() {
-            const content = document.getElementById('msgInput').value.trim();
-            if (!content) return;
-            messages.push({
-                user: currentUser,
-                content: content,
-                time: new Date()
+    // ---- 本地注册（用户名+密码）----
+    function register() {
+        const user = document.getElementById('regUser').value;
+        const pwd = document.getElementById('regPwd').value;
+        if (!user || !pwd || pwd.length < 6) return alert('用户名和密码不能为空，密码至少6位');
+        if (localStorage.getItem('user_' + user)) return alert('用户名已存在');
+        localStorage.setItem('user_' + user, pwd);
+        alert('注册成功！请登录');
+        showPanel('login');
+    }
+
+    // ---- 本地登录 ----
+    function login() {
+        const user = document.getElementById('loginUser').value;
+        const pwd = document.getElementById('loginPwd').value;
+        if (!user || !pwd) return alert('请填写完整信息');
+        if (localStorage.getItem('user_' + user) !== pwd) return alert('用户名或密码错误');
+        currentUser = user;
+        document.getElementById('authContainer').style.display = 'none';
+        document.getElementById('chatContainer').style.display = 'block';
+        document.getElementById('currentUser').innerText = user;
+        loadMessages();
+        // 每3秒自动刷新消息，实现互通
+        setInterval(loadMessages, 3000);
+    }
+
+    function logout() {
+        currentUser = null;
+        location.reload();
+    }
+
+    // ---- 加载消息（从公共数据库读取）----
+    async function loadMessages() {
+        try {
+            const res = await fetch(API_URL);
+            const data = await res.json();
+            renderMessages(data);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // ---- 发送消息（写入公共数据库）----
+    async function sendMessage() {
+        const content = document.getElementById('msgInput').value.trim();
+        if (!content || !currentUser) return;
+        try {
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user: currentUser,
+                    content: content,
+                    time: new Date().toISOString()
+                })
             });
             document.getElementById('msgInput').value = '';
             loadMessages();
+        } catch (e) {
+            console.error(e);
+            alert('发送失败，请稍后重试');
+        }
+    }
+
+    // ---- 渲染消息列表 ----
+    function renderMessages(messages) {
+        const list = document.getElementById('msgList');
+        list.innerHTML = '';
+        
+        if (messages.length === 0) {
+            list.innerHTML = '<div class="system-tip">还没有消息，快来发送第一条吧！</div>';
+            return;
         }
 
-        function logout() {
-            location.reload();
-        }
+        messages.forEach(msg => {
+            const isSelf = msg.user === currentUser;
+            const div = document.createElement('div');
+            div.className = isSelf ? 'msg-item msg-self' : 'msg-item msg-other';
+            
+            const time = new Date(msg.time).toLocaleString();
+            
+            div.innerHTML = `
+                <div class="msg-meta">${msg.user} · ${time}</div>
+                <div class="msg-content">${msg.content}</div>
+            `;
+            list.appendChild(div);
+        });
 
-        // 页面加载时显示欢迎消息
-        loadMessages();
-    </script>
+        // 滚动到底部
+        list.scrollTop = list.scrollHeight;
+    }
+</script>
 </body>
 </html>
