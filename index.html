@@ -1,115 +1,176 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<title>多人在线聊天</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;background:#f3f4f6;font-family:Arial}
-.main{max-width:900px;margin:20px auto}
-.card{background:white;border-radius:10px;padding:16px;box-shadow:0 1px 3px #0000001f}
-input{width:100%;padding:10px;margin:6px 0;border:1px solid #ddd;border-radius:6px}
-button{padding:10px 16px;background:#007bff;color:white;border:none;border-radius:6px;cursor:pointer}
-.gray{background:#6c757d}
-.msg{padding:8px 12px;background:#f1f1f1;border-radius:6px;margin:6px 0}
-</style>
+    <meta charset="UTF-8">
+    <title>公共聊天室</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #f3f4f6; font-family: Arial; }
+        .container { max-width: 900px; margin: 20px auto; }
+        .card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; }
+        button { padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; }
+        .btn-blue { background: #007bff; color: white; }
+        .btn-gray { background: #6c757d; color: white; margin-left: 8px; }
+        .msg { padding: 10px; background: #f1f1f1; border-radius: 6px; margin: 8px 0; }
+        .msg-admin { background: #dbeafe; }
+        .msg-info { font-size: 12px; color: #666; margin-bottom: 4px; }
+    </style>
 </head>
 <body>
-<div class="main">
+    <div class="container">
+        <!-- 登录面板 -->
+        <div id="loginPanel" class="card">
+            <h2 style="margin-bottom: 16px;">账号登录</h2>
+            <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+                <button onclick="showPanel('login')" class="btn-blue" id="tabLogin">登录</button>
+                <button onclick="showPanel('register')" class="btn-gray" id="tabRegister">注册</button>
+            </div>
 
-  <div id="login" class="card">
-    <h3>登录</h3>
-    <input id="login_user" placeholder="用户名">
-    <input id="login_pwd" type="password" placeholder="密码">
-    <button onclick="login()">登录</button>
-    <button class="gray" onclick="goReg()">去注册</button>
-  </div>
+            <div id="loginForm">
+                <input type="email" id="loginEmail" placeholder="邮箱地址">
+                <input type="password" id="loginPwd" placeholder="密码" style="margin-bottom: 16px;">
+                <button onclick="login()" class="btn-blue" style="width: 100%;">登录</button>
+            </div>
 
-  <div id="reg" class="card" style="display:none">
-    <h3>注册</h3>
-    <input id="reg_user" placeholder="用户名">
-    <input id="reg_pwd" type="password" placeholder="密码">
-    <button onclick="reg()">注册</button>
-    <button class="gray" onclick="goLogin()">返回登录</button>
-  </div>
+            <div id="registerForm" style="display: none;">
+                <input type="email" id="regEmail" placeholder="邮箱地址">
+                <input type="password" id="regPwd" placeholder="密码（至少6位）" style="margin-bottom: 16px;">
+                <button onclick="register()" class="btn-blue" style="width: 100%;">注册</button>
+            </div>
+        </div>
 
-  <div id="chat" class="card" style="display:none;margin-top:20px">
-    <div id="msgList" style="height:350px;overflow-y:auto;margin-bottom:12px"></div>
-    <div style="display:flex;gap:8px">
-      <input id="msg" placeholder="输入消息..." style="flex:1">
-      <button onclick="send()">发送</button>
+        <!-- 聊天面板 -->
+        <div id="chatPanel" class="card" style="display: none; margin-top: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <span id="userInfo"></span>
+                <button onclick="logout()" class="btn-gray">退出登录</button>
+            </div>
+            <div id="msgList" style="height: 350px; overflow-y: auto; margin-bottom: 16px;"></div>
+            <div style="display: flex; gap: 8px;">
+                <input id="msgInput" placeholder="输入消息..." style="flex: 1;">
+                <button onclick="sendMessage()" class="btn-blue">发送</button>
+            </div>
+        </div>
     </div>
-  </div>
 
-</div>
+    <!-- 加载 Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // 配置区（你的 Supabase 信息）
+        const SUPABASE_URL = 'https://ceapbcodobfkdakkcfgv.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_3ZEm9C76K2RzRlsXvm-DKw_ofuJBVuY';
+        const ADMIN_EMAIL = '3961659749@qq.com';
 
-<script>
-// 全局
-let nowUser = null
+        // 初始化 Supabase
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// 切换面板
-function goReg(){
-  document.getElementById('login').style.display='none'
-  document.getElementById('reg').style.display='block'
-}
-function goLogin(){
-  document.getElementById('reg').style.display='none'
-  document.getElementById('login').style.display='block'
-}
+        let currentUser = null;
+        let isAdmin = false;
 
-// 注册
-function reg(){
-  let u = document.getElementById('reg_user').value
-  let p = document.getElementById('reg_pwd').value
-  if(!u||!p)return alert('请填写完整')
-  localStorage.setItem('user_'+u, p)
-  alert('注册成功！请登录')
-  goLogin()
-}
+        // 切换登录/注册面板
+        function showPanel(type) {
+            if (type === 'login') {
+                document.getElementById('loginForm').style.display = 'block';
+                document.getElementById('registerForm').style.display = 'none';
+                document.getElementById('tabLogin').classList.replace('btn-gray', 'btn-blue');
+                document.getElementById('tabRegister').classList.replace('btn-blue', 'btn-gray');
+            } else {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('registerForm').style.display = 'block';
+                document.getElementById('tabLogin').classList.replace('btn-blue', 'btn-gray');
+                document.getElementById('tabRegister').classList.replace('btn-gray', 'btn-blue');
+            }
+        }
 
-// 登录
-function login(){
-  let u = document.getElementById('login_user').value
-  let p = document.getElementById('login_pwd').value
-  if(localStorage.getItem('user_'+u)===p){
-    nowUser = u
-    document.getElementById('login').style.display='none'
-    document.getElementById('reg').style.display='none'
-    document.getElementById('chat').style.display='block'
-    loadMsg()
-    setInterval(loadMsg, 1000)
-  }else{
-    alert('账号或密码错误')
-  }
-}
+        // 注册
+        async function register() {
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPwd').value;
+            if (!email || !password) return alert('请填写完整信息');
+            
+            const { error } = await supabase.auth.signUp({ email, password });
+            if (error) alert(error.message);
+            else alert('注册成功！请登录');
+        }
 
-// 发送消息
-function send(){
-  let txt = document.getElementById('msg').value.trim()
-  if(!txt||!nowUser)return
-  let msgs = JSON.parse(localStorage.getItem('chats')||'[]')
-  msgs.push({
-    user: nowUser,
-    text: txt,
-    time: new Date().toLocaleString()
-  })
-  localStorage.setItem('chats', JSON.stringify(msgs))
-  document.getElementById('msg').value=''
-  loadMsg()
-}
+        // 登录
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPwd').value;
+            if (!email || !password) return alert('请填写完整信息');
+            
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) alert(error.message);
+            else handleLoginSuccess(data.user);
+        }
 
-// 加载消息
-function loadMsg(){
-  let list = document.getElementById('msgList')
-  let msgs = JSON.parse(localStorage.getItem('chats')||'[]')
-  list.innerHTML = msgs.map(m=>`
-    <div class="msg">
-      <div style="font-size:12px;color:#666">${m.user} · ${m.time}</div>
-      <div>${m.text}</div>
-    </div>
-  `).join('')
-  list.scrollTop = list.scrollHeight
-}
-</script>
+        // 登录成功处理
+        function handleLoginSuccess(user) {
+            currentUser = user;
+            isAdmin = user.email === ADMIN_EMAIL;
+            document.getElementById('loginPanel').style.display = 'none';
+            document.getElementById('chatPanel').style.display = 'block';
+            document.getElementById('userInfo').textContent = `当前用户：${user.email}`;
+            if (isAdmin) alert('你是管理员，右键消息可删除');
+            loadMessages();
+            // 实时监听新消息
+            supabase.channel('public:messages')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, loadMessages)
+                .subscribe();
+        }
+
+        // 登出
+        async function logout() {
+            await supabase.auth.signOut();
+            location.reload();
+        }
+
+        // 加载消息
+        async function loadMessages() {
+            const { data, error } = await supabase
+                .from('messages')
+                .select('*')
+                .order('created_at', { ascending: true });
+            
+            if (error) return alert(error.message);
+            const list = document.getElementById('msgList');
+            list.innerHTML = data.map(msg => `
+                <div class="msg ${msg.user_email === ADMIN_EMAIL ? 'msg-admin' : ''}" ${isAdmin ? `oncontextmenu="confirmDelete(${msg.id})"` : ''}>
+                    <div class="msg-info">${msg.user_email} · ${new Date(msg.created_at).toLocaleString()}</div>
+                    <div>${msg.content}</div>
+                </div>
+            `).join('');
+            list.scrollTop = list.scrollHeight;
+        }
+
+        // 发送消息
+        async function sendMessage() {
+            const content = document.getElementById('msgInput').value.trim();
+            if (!content || !currentUser) return;
+            
+            const { error } = await supabase.from('messages').insert([{
+                user_email: currentUser.email,
+                content: content
+            }]);
+            
+            if (error) alert(error.message);
+            else document.getElementById('msgInput').value = '';
+        }
+
+        // 管理员删除消息
+        async function confirmDelete(id) {
+            event.preventDefault();
+            if (confirm('确定删除这条消息？')) {
+                const { error } = await supabase.from('messages').delete().eq('id', id);
+                if (error) alert(error.message);
+            }
+        }
+
+        // 页面加载时检查登录状态
+        supabase.auth.onAuthStateChange((event, session) => {
+            if (session) handleLoginSuccess(session.user);
+        });
+    </script>
 </body>
 </html>
