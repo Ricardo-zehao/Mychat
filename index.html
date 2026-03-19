@@ -2,81 +2,113 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>简易聊天</title>
+<title>多人在线聊天</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial;background:#f0f0f0}
-.box{border:1px solid #ccc;border-radius:8px;padding:10px;background:white}
-button{cursor:pointer}
+body{margin:0;background:#f3f4f6;font-family:Arial}
+.main{max-width:900px;margin:20px auto}
+.card{background:white;border-radius:10px;padding:16px;box-shadow:0 1px 3px #0000001f}
+input{width:100%;padding:10px;margin:6px 0;border:1px solid #ddd;border-radius:6px}
+button{padding:10px 16px;background:#007bff;color:white;border:none;border-radius:6px;cursor:pointer}
+.gray{background:#6c757d}
+.msg{padding:8px 12px;background:#f1f1f1;border-radius:6px;margin:6px 0}
 </style>
 </head>
 <body>
-<div style="max-width:800px;margin:20px auto">
-  <div id="loginBox" class="box">
+<div class="main">
+
+  <div id="login" class="card">
     <h3>登录</h3>
-    <input id="email" placeholder="邮箱" style="width:100%;padding:8px;margin:5px 0"><br>
-    <input id="pwd" placeholder="密码" type="password" style="width:100%;padding:8px;margin:5px 0"><br>
-    <button onclick="doLogin()" style="padding:8px 16px">登录</button>
-    <button onclick="showReg()" style="padding:8px 16px">去注册</button>
+    <input id="login_user" placeholder="用户名">
+    <input id="login_pwd" type="password" placeholder="密码">
+    <button onclick="login()">登录</button>
+    <button class="gray" onclick="goReg()">去注册</button>
   </div>
 
-  <div id="regBox" class="box" style="display:none">
+  <div id="reg" class="card" style="display:none">
     <h3>注册</h3>
-    <input id="regEmail" placeholder="邮箱" style="width:100%;padding:8px;margin:5px 0"><br>
-    <input id="regPwd" placeholder="密码" type="password" style="width:100%;padding:8px;margin:5px 0"><br>
-    <button onclick="doReg()" style="padding:8px 16px">注册</button>
-    <button onclick="showLogin()" style="padding:8px 16px">返回登录</button>
+    <input id="reg_user" placeholder="用户名">
+    <input id="reg_pwd" type="password" placeholder="密码">
+    <button onclick="reg()">注册</button>
+    <button class="gray" onclick="goLogin()">返回登录</button>
   </div>
 
-  <div id="chatBox" class="box" style="display:none;margin-top:20px">
-    <div id="msgList" style="height:300px;overflow-y:auto;border:1px solid #ddd;padding:10px;margin-bottom:10px"></div>
-    <input id="msgInput" placeholder="输入消息..." style="width:70%;padding:8px">
-    <button onclick="sendMsg()" style="padding:8px 16px">发送</button>
+  <div id="chat" class="card" style="display:none;margin-top:20px">
+    <div id="msgList" style="height:350px;overflow-y:auto;margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px">
+      <input id="msg" placeholder="输入消息..." style="flex:1">
+      <button onclick="send()">发送</button>
+    </div>
   </div>
+
 </div>
 
 <script>
-// 本地模拟登录注册（无外部CDN，国内100%能用）
-let user = null;
+// 全局
+let nowUser = null
 
-function showReg() {
-  document.getElementById('loginBox').style.display='none';
-  document.getElementById('regBox').style.display='block';
+// 切换面板
+function goReg(){
+  document.getElementById('login').style.display='none'
+  document.getElementById('reg').style.display='block'
 }
-function showLogin() {
-  document.getElementById('regBox').style.display='none';
-  document.getElementById('loginBox').style.display='block';
-}
-
-function doReg() {
-  const e = document.getElementById('regEmail').value;
-  const p = document.getElementById('regPwd').value;
-  if(!e||!p)return alert('填完整');
-  localStorage.setItem('user_'+e,p);
-  alert('注册成功！请登录');
-  showLogin();
+function goLogin(){
+  document.getElementById('reg').style.display='none'
+  document.getElementById('login').style.display='block'
 }
 
-function doLogin() {
-  const e = document.getElementById('email').value;
-  const p = document.getElementById('pwd').value;
-  if(localStorage.getItem('user_'+e)===p){
-    user=e;
-    document.getElementById('loginBox').style.display='none';
-    document.getElementById('regBox').style.display='none';
-    document.getElementById('chatBox').style.display='block';
+// 注册
+function reg(){
+  let u = document.getElementById('reg_user').value
+  let p = document.getElementById('reg_pwd').value
+  if(!u||!p)return alert('请填写完整')
+  localStorage.setItem('user_'+u, p)
+  alert('注册成功！请登录')
+  goLogin()
+}
+
+// 登录
+function login(){
+  let u = document.getElementById('login_user').value
+  let p = document.getElementById('login_pwd').value
+  if(localStorage.getItem('user_'+u)===p){
+    nowUser = u
+    document.getElementById('login').style.display='none'
+    document.getElementById('reg').style.display='none'
+    document.getElementById('chat').style.display='block'
+    loadMsg()
+    setInterval(loadMsg, 1000)
   }else{
-    alert('账号或密码错误');
+    alert('账号或密码错误')
   }
 }
 
-function sendMsg() {
-  const txt = document.getElementById('msgInput').value;
-  if(!txt||!user)return;
-  const d = document.getElementById('msgList');
-  d.innerHTML += '<p>'+user+'：'+txt+'</p>';
-  d.scrollTop = d.scrollHeight;
-  document.getElementById('msgInput').value='';
+// 发送消息
+function send(){
+  let txt = document.getElementById('msg').value.trim()
+  if(!txt||!nowUser)return
+  let msgs = JSON.parse(localStorage.getItem('chats')||'[]')
+  msgs.push({
+    user: nowUser,
+    text: txt,
+    time: new Date().toLocaleString()
+  })
+  localStorage.setItem('chats', JSON.stringify(msgs))
+  document.getElementById('msg').value=''
+  loadMsg()
+}
+
+// 加载消息
+function loadMsg(){
+  let list = document.getElementById('msgList')
+  let msgs = JSON.parse(localStorage.getItem('chats')||'[]')
+  list.innerHTML = msgs.map(m=>`
+    <div class="msg">
+      <div style="font-size:12px;color:#666">${m.user} · ${m.time}</div>
+      <div>${m.text}</div>
+    </div>
+  `).join('')
+  list.scrollTop = list.scrollHeight
 }
 </script>
 </body>
