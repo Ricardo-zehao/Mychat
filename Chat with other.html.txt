@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>免费简易聊天站</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 flex flex-col h-screen">
+    <nav class="bg-blue-600 text-white p-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold">🗨️ 免费简易聊天站</h1>
+        <div id="user-status" class="flex items-center gap-3">
+            <span id="user-email" class="hidden"></span>
+            <button onclick="logout()" class="bg-red-500 px-3 py-1 rounded hover:bg-red-600 hidden" id="logout-btn">退出</button>
+        </div>
+    </nav>
+
+    <div class="flex flex-1 overflow-hidden">
+        <div id="auth-panel" class="w-80 bg-white p-6 shadow-lg flex flex-col justify-center">
+            <h2 class="text-2xl font-bold mb-6 text-center">账号登录</h2>
+            <div class="tabs flex mb-4">
+                <button onclick="showTab('login')" class="flex-1 py-2 border-b-2 border-blue-600 text-blue-600" id="tab-login">登录</button>
+                <button onclick="showTab('register')" class="flex-1 py-2 text-gray-500" id="tab-register">注册</button>
+            </div>
+            <div id="login-form" class="space-y-4">
+                <input type="email" id="login-email" placeholder="邮箱地址" class="w-full p-3 border rounded">
+                <input type="password" id="login-pwd" placeholder="密码" class="w-full p-3 border rounded">
+                <button onclick="login()" class="w-full bg-blue-600 text-white p-3 rounded hover:bg-blue-700">登录</button>
+            </div>
+            <div id="register-form" class="space-y-4 hidden">
+                <input type="email" id="reg-email" placeholder="邮箱地址" class="w-full p-3 border rounded">
+                <input type="password" id="reg-pwd" placeholder="密码(至少6位)" class="w-full p-3 border rounded">
+                <button onclick="register()" class="w-full bg-green-600 text-white p-3 rounded hover:bg-green-700">注册</button>
+            </div>
+        </div>
+
+        <div class="flex-1 flex flex-col bg-white ml-4 shadow-lg">
+            <div id="message-list" class="flex-1 p-4 overflow-y-auto"></div>
+            <div class="border-t p-3">
+                <div class="flex gap-2 mb-2 flex-wrap">
+                    <button onclick="addEmoji('😊')" class="text-xl p-1">😊</button>
+                    <button onclick="addEmoji('😂')" class="text-xl p-1">😂</button>
+                    <button onclick="addEmoji('👍')" class="text-xl p-1">👍</button>
+                    <button onclick="addEmoji('🔥')" class="text-xl p-1">🔥</button>
+                    <button onclick="addEmoji('❤️')" class="text-xl p-1">❤️</button>
+                    <button onclick="addEmoji('🎉')" class="text-xl p-1">🎉</button>
+                    <button onclick="addEmoji('😎')" class="text-xl p-1">😎</button>
+                    <button onclick="addEmoji('🤔')" class="text-xl p-1">🤔</button>
+                </div>
+                <div class="flex gap-2">
+                    <input id="message-input" type="text" placeholder="输入消息..." class="flex-1 p-3 border rounded" disabled>
+                    <button onclick="sendMessage()" class="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700" id="send-btn" disabled>发送</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ---------------- 配置区：已帮你填好 ----------------
+        const SUPABASE_URL = 'https://ceapbcodobfkdakkcfgv.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_3ZEm9C76K2RzRLsXvm-DKw_ofuJB...'; // 请补全完整key
+        const ADMIN_EMAIL = '3961659749@qq.com'; // 替换成你自己的邮箱
+        // ------------------------------------------------------
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let currentTab = 'login';
+        let isAdmin = false;
+
+        function showTab(tab) {
+            currentTab = tab;
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.add('hidden');
+            document.getElementById('tab-login').classList.remove('border-blue-600', 'text-blue-600');
+            document.getElementById('tab-register').classList.remove('border-blue-600', 'text-blue-600');
+            if (tab === 'login') {
+                document.getElementById('login-form').classList.remove('hidden');
+                document.getElementById('tab-login').classList.add('border-blue-600', 'text-blue-600');
+            } else {
+                document.getElementById('register-form').classList.remove('hidden');
+                document.getElementById('tab-register').classList.add('border-blue-600', 'text-blue-600');
+            }
+        }
+
+        async function register() {
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-pwd').value;
+            if (!email || !password) return alert('请填写完整');
+            const { data, error } = await supabase.auth.signUp({ email, password });
+            if (error) alert(error.message);
+            else alert('注册成功！请登录');
+        }
+
+        async function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-pwd').value;
+            if (!email || !password) return alert('请填写完整');
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) alert(error.message);
+            else handleAuthSuccess(data.user);
+        }
+
+        async function logout() {
+            await supabase.auth.signOut();
+            location.reload();
+        }
+
+        function handleAuthSuccess(user) {
+            document.getElementById('auth-panel').style.display = 'none';
+            document.getElementById('user-email').style.display = 'block';
+            document.getElementById('logout-btn').style.display = 'block';
+            document.getElementById('user-email').innerText = user.email;
+            document.getElementById('message-input').disabled = false;
+            document.getElementById('send-btn').disabled = false;
+            isAdmin = user.email === ADMIN_EMAIL;
+            if (isAdmin) alert('你已获得管理员权限！右键/长按消息可删除');
+            loadMessages();
+        }
+
+        async function sendMessage() {
+            const content = document.getElementById('message-input').value.trim();
+            if (!content) return;
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return alert('请先登录');
+            const { error } = await supabase.from('messages').insert([{ user_email: user.email, content }]);
+            if (error) alert(error.message);
+            else document.getElementById('message-input').value = '';
+        }
+
+        async function loadMessages() {
+            const { data, error } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
+            if (error) return alert(error.message);
+            const list = document.getElementById('message-list');
+            list.innerHTML = '';
+            data.forEach(msg => {
+                const isAdminMsg = msg.user_email === ADMIN_EMAIL;
+                const div = document.createElement('div');
+                div.className = `mb-4 p-3 rounded-lg max-w-[80%] ${isAdminMsg ? 'bg-blue-100 ml-auto' : 'bg-gray-100'}`;
+                div.innerHTML = `
+                    <div class="text-sm text-gray-500 mb-1">${msg.user_email} ${new Date(msg.created_at).toLocaleString()}</div>
+                    <div class="text-base">${msg.content}</div>
+                `;
+                if (isAdmin) {
+                    div.oncontextmenu = (e) => {
+                        e.preventDefault();
+                        if (confirm('确定删除这条消息？')) deleteMessage(msg.id);
+                    };
+                }
+                list.appendChild(div);
+            });
+            list.scrollTop = list.scrollHeight;
+        }
+
+        async function deleteMessage(id) {
+            const { error } = await supabase.from('messages').delete().eq('id', id);
+            if (error) alert(error.message);
+            else loadMessages();
+        }
+
+        function addEmoji(emoji) {
+            const input = document.getElementById('message-input');
+            input.value += emoji;
+            input.focus();
+        }
+
+        supabase.auth.onAuthStateChange((event, session) => {
+            if (session) handleAuthSuccess(session.user);
+        });
+    </script>
+</body>
+</html>
